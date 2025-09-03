@@ -5,7 +5,7 @@ use rdkafka::consumer::{StreamConsumer, Consumer};
 use rdkafka::{ClientConfig, Message};
 use rdkafka::message::Headers;
 use serde_json::Value;
-use solana_stub_prover_script::types::{ZkProof, ProofData};
+use twine_types::proofs::{ZkProof, ProofData};
 use futures::StreamExt;
 use chrono::Utc;
 use std::time::Duration;
@@ -390,13 +390,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             print_proof_details(&proof, args.raw, args.minimal);
                         }
                         Err(e) => {
-                            // Try to parse as generic JSON for debugging
-                            if let Ok(json) = serde_json::from_slice::<Value>(payload) {
-                                eprintln!("⚠️  Could not parse as ZkProof, showing raw JSON:");
-                                println!("{}", serde_json::to_string_pretty(&json)?);
-                            } else {
-                                eprintln!("❌ Error parsing message: {}", e);
-                                eprintln!("   Raw payload: {}", String::from_utf8_lossy(payload));
+                            eprintln!("❌ Error parsing message as ZkProof: {}", e);
+                            if args.debug {
+                                // Try to parse as generic JSON for debugging
+                                if let Ok(json) = serde_json::from_slice::<Value>(payload) {
+                                    println!("Raw JSON structure:");
+                                    println!("{}", serde_json::to_string_pretty(&json)?);
+                                } else {
+                                    eprintln!("Raw payload: {}", String::from_utf8_lossy(payload));
+                                }
                             }
                         }
                     }

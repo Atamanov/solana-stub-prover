@@ -1,4 +1,4 @@
-use crate::types::ZkProof;
+use twine_types::proofs::ZkProof;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::ClientConfig;
 use serde_json::Value;

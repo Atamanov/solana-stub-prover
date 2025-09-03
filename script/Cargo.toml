@@ -24,6 +24,9 @@ clap = { version = "4.0", features = ["derive", "env"] }
 tracing = "0.1.40"
 hex = "0.4.3"
 solana-stub-prover-lib = { path = "../lib" }
+twine-types = { path = "../../weaver/crates/types" }
+# Match the actual version being used by weaver
+alloy-primitives = "1.2.1"
 dotenv = "0.15.0"
 reqwest = { version = "0.11", features = ["json"] }
 tokio = { version = "1", features = ["full"] }

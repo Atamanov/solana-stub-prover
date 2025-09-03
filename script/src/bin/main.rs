@@ -12,6 +12,7 @@ use solana_stub_prover_script::{
     utils::{base58_to_bytes32, get_epoch_for_slot, sha256_from_u64, sha256_hash},
 };
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
+use twine_types::proofs::{ZkProof, ProofKind, ProofData, SP1Proof};
 
 /// The ELF file for the Solana stub prover program
 pub const PROVER_ELF: &[u8] = include_elf!("solana-stub-prover-program");
@@ -212,17 +213,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             fs::write("last_proof.json", &proof_json).expect("Failed to write last_proof.json");
             println!("Proof saved to last_proof.json");
             
-            // Create ZkProof structure for Kafka
-            let zk_proof = serde_json::json!({
-                "identifier": format!("solana-stub-{}-{}", args.start_slot, effective_end_slot),
-                "kind": "SolanaConsensusProof",
-                "proof_data": {
-                    "type": "SP1_Compressed",
-                    "version": 1,
-                    "proof": serde_json::from_str::<serde_json::Value>(&proof_json).unwrap(),
-                    "public_values": hex::encode(proof.public_values.to_vec()),
-                }
-            });
+            // Create ZkProof structure for Kafka using weaver types
+            let proof_bytes = bincode::serialize(&proof).expect("Failed to serialize compressed proof");
+            let vk_hash = sha256_hash(&bincode::serialize(&vk).unwrap_or_default());
+            let vk_bytes: [u8; 32] = vk_hash.try_into().unwrap_or([0u8; 32]);
+            
+            let sp1_proof = SP1Proof {
+                version: 1,
+                proof: proof_bytes,
+                public_value: proof.public_values.to_vec(),
+                verification_key: vk_bytes,
+            };
+            
+            let zk_proof = ZkProof {
+                identifier: format!("solana-stub-{}-{}", args.start_slot, effective_end_slot),
+                proof_kind: ProofKind::SolanaConsensusProof,
+                proof_data: ProofData::SP1(sp1_proof),
+            };
             
             // Save full ZkProof structure to file as well
             let zk_proof_json = serde_json::to_string_pretty(&zk_proof).expect("Failed to serialize ZkProof");
@@ -240,7 +247,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             
             // Publish to Kafka as JSON
             println!("Publishing compressed proof to Kafka...");
-            publish_json_to_kafka_with_config(zk_proof, &kafka_config).await?;
+            let json_value = serde_json::to_value(&zk_proof).expect("Failed to convert to JSON value");
+            publish_json_to_kafka_with_config(json_value, &kafka_config).await?;
             println!("Compressed proof successfully published to Kafka!");
         } else {
             // Generate Groth16 proof for on-chain verification (default)
@@ -261,30 +269,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             fs::write("last_proof.json", &proof_json).expect("Failed to write last_proof.json");
             println!("Groth16 proof saved to last_proof.json");
             
-            // Extract public values if available
-            let public_values_hex = if let Ok(public_values) = serde_json::to_value(&groth16_proof) {
-                if let Some(pv) = public_values.get("public_values") {
-                    pv.to_string()
-                } else {
-                    // If no public_values field, encode the whole proof
-                    hex::encode(bincode::serialize(&groth16_proof).unwrap_or_default())
-                }
-            } else {
-                String::from("0x")
+            // Create ZkProof structure for Kafka using weaver types
+            let proof_bytes = bincode::serialize(&groth16_proof).expect("Failed to serialize Groth16 proof");
+            let vk_hash = sha256_hash(&bincode::serialize(&vk).unwrap_or_default());
+            let vk_bytes: [u8; 32] = vk_hash.try_into().unwrap_or([0u8; 32]);
+            
+            // Extract public values - for Groth16, we need to get them from the original output
+            let (output, _) = client.execute(PROVER_ELF, &stdin).run().unwrap();
+            let commitments: PublicCommitments = bincode::deserialize(&output.to_vec()).unwrap();
+            let public_values = bincode::serialize(&commitments).unwrap_or_default();
+            
+            let sp1_proof = SP1Proof {
+                version: 2,  // Version 2 for Groth16
+                proof: proof_bytes,
+                public_value: public_values,
+                verification_key: vk_bytes,
             };
             
-            // Create ZkProof structure as JSON
-            let zk_proof = serde_json::json!({
-                "identifier": format!("solana-stub-{}-{}", args.start_slot, effective_end_slot),
-                "kind": "SolanaConsensusProof",
-                "proof_data": {
-                    "type": "SP1_Groth16",
-                    "version": 2,
-                    "proof": serde_json::from_str::<serde_json::Value>(&proof_json).unwrap(),
-                    "public_values": public_values_hex,
-                    "groth16": true
-                }
-            });
+            let zk_proof = ZkProof {
+                identifier: format!("solana-stub-{}-{}", args.start_slot, effective_end_slot),
+                proof_kind: ProofKind::SolanaConsensusProof,
+                proof_data: ProofData::SP1(sp1_proof),
+            };
             
             // Save full ZkProof structure to file as well
             let zk_proof_json = serde_json::to_string_pretty(&zk_proof).expect("Failed to serialize ZkProof");
@@ -302,7 +308,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             
             // Publish to Kafka as JSON
             println!("Publishing Groth16 proof to Kafka...");
-            publish_json_to_kafka_with_config(zk_proof, &kafka_config).await?;
+            let json_value = serde_json::to_value(&zk_proof).expect("Failed to convert to JSON value");
+            publish_json_to_kafka_with_config(json_value, &kafka_config).await?;
             println!("Groth16 proof successfully published to Kafka!");
         }
     }
