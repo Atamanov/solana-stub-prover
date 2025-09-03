@@ -1,0 +1,35 @@
+[package]
+version = "0.1.0"
+name = "solana-stub-prover-script"
+edition = "2021"
+default-run = "solana-stub-prover"
+
+[[bin]]
+name = "solana-stub-prover"
+path = "src/bin/main.rs"
+
+[[bin]]
+name = "consumer"
+path = "src/bin/consumer.rs"
+
+[dependencies]
+sp1-sdk = "5.0.8"
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+serde = { version = "1.0.200", default-features = false, features = ["derive"] }
+clap = { version = "4.0", features = ["derive", "env"] }
+tracing = "0.1.40"
+hex = "0.4.3"
+solana-stub-prover-lib = { path = "../lib" }
+dotenv = "0.15.0"
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+sha2 = "0.10"
+rdkafka = { version = "0.36", features = ["tokio"] }
+base64 = "0.21"
+bs58 = "0.5"
+bincode = "1.3"
+futures = "0.3"
+chrono = "0.4"
+
+[build-dependencies]
+sp1-build = "5.0.8"

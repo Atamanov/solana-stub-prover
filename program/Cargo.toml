@@ -1,0 +1,10 @@
+[package]
+version = "0.1.0"
+name = "solana-stub-prover-program"
+edition = "2021"
+
+[dependencies]
+sp1-zkvm = "5.0.8"
+solana-stub-prover-lib = { path = "../lib" }
+sha2 = "0.10"
+bincode = "1.3"
