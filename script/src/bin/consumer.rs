@@ -340,7 +340,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => {
             eprintln!("❌ Failed to create consumer: {}", e);
             eprintln!("\n💡 Possible solutions:");
-            eprintln!("   - Check broker connectivity: telnet {} <port>", args.broker.split(':').next().unwrap_or(&args.broker));
+            eprintln!("   - Check broker connectivity: telnet {} <port>", 
+                     args.broker.as_ref().map(|b| b.split(':').next().unwrap_or(b)).unwrap_or(&broker));
             eprintln!("   - Verify Kafka is running on the specified broker");
             eprintln!("   - Check authentication credentials if SASL is enabled");
             return Err(Box::new(e));

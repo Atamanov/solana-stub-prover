@@ -64,13 +64,13 @@ RUST_LOG=info cargo run --release --bin solana-stub-prover -- \
 - `--groth16`: Generate Groth16 proof for on-chain verification (default: true)
 - `--compressed-only`: Generate only compressed proof (faster, not verifiable on-chain)
 
-#### Kafka TLS Parameters
+#### Kafka Connection Parameters
+- `--kafka-broker <ADDRESS>`: Override Kafka broker address
 - `--kafka-tls`: Use TLS for Kafka connection (default: true)
 - `--no-kafka-tls`: Disable TLS, use plain connection
 - `--kafka-ca-cert <PATH>`: CA certificate file path (default: ./ca.crt)
 - `--kafka-client-cert <PATH>`: Client certificate file path (default: ./user.crt)
 - `--kafka-client-key <PATH>`: Client key file path (default: ./user.key)
-- `--kafka-broker <ADDRESS>`: Override Kafka broker address
 
 ## Kafka Consumer
 
@@ -123,18 +123,30 @@ cargo run --release --bin consumer -- --connection-timeout 60
 
 ### Consumer Parameters
 
-- `--broker <BROKER>` - Kafka broker address (default: AWS MSK broker)
+#### Connection Parameters
+- `--broker <BROKER>` - Kafka broker address (default: kafka-bootstrap.twine.limited:443 with TLS)
 - `--group-id <ID>` - Consumer group ID (default: solana-proof-consumer)
-- `--from-beginning` - Start reading from the beginning of the topic
-- `--raw` - Show raw JSON output
-- `--minimal` - Show only proof identifiers
+- `--connection-timeout <SECS>` - Connection timeout in seconds (default: 30)
+
+#### TLS/Security Parameters
+- `--tls` - Use TLS connection (default: true)
+- `--no-tls` - Disable TLS, use plain connection
+- `--ca-cert <PATH>` - CA certificate file path (default: ./ca.crt)
+- `--client-cert <PATH>` - Client certificate file path (default: ./user.crt)
+- `--client-key <PATH>` - Client key file path (default: ./user.key)
+- `--security-protocol <PROTO>` - Security protocol: plaintext, ssl, sasl_plaintext, sasl_ssl
+
+#### SASL Authentication Parameters
 - `--sasl` - Enable SASL authentication
 - `--username <USER>` - SASL username (or set KAFKA_USERNAME env var)
 - `--password <PASS>` - SASL password (or set KAFKA_PASSWORD env var)
 - `--sasl-mechanism <MECH>` - SASL mechanism: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512
-- `--security-protocol <PROTO>` - Security protocol: plaintext, ssl, sasl_plaintext, sasl_ssl
+
+#### Output Options
+- `--from-beginning` - Start reading from the beginning of the topic
+- `--raw` - Show raw JSON output
+- `--minimal` - Show only proof identifiers
 - `--debug` - Enable debug output
-- `--connection-timeout <SECS>` - Connection timeout in seconds (default: 30)
 
 ### Example Consumer Output
 

@@ -52,9 +52,17 @@ struct Args {
     #[arg(long)]
     compressed_only: bool,
     
+    /// Kafka broker address (overrides default)
+    #[arg(long)]
+    kafka_broker: Option<String>,
+    
     /// Use TLS for Kafka connection (default: true)
     #[arg(long, default_value = "true")]
     kafka_tls: bool,
+    
+    /// Disable Kafka TLS (use plain connection)
+    #[arg(long)]
+    no_kafka_tls: bool,
     
     /// CA certificate file path for Kafka TLS
     #[arg(long, default_value = "./ca.crt")]
@@ -67,14 +75,6 @@ struct Args {
     /// Client key file path for Kafka TLS
     #[arg(long, default_value = "./user.key")]
     kafka_client_key: String,
-    
-    /// Kafka broker address (overrides default)
-    #[arg(long)]
-    kafka_broker: Option<String>,
-    
-    /// Disable Kafka TLS (use plain connection)
-    #[arg(long)]
-    no_kafka_tls: bool,
 }
 
 #[tokio::main]
