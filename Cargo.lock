@@ -5318,6 +5318,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 [[package]]
 name = "twine-types"
 version = "0.1.0"
+source = "git+ssh://git@github.com/twinexyz/weaver?branch=lilixac%2Fintegrate-aggregator#c4244669a53855a4af2643fe4bed9eb968aa93f1"
 dependencies = [
  "alloy-primitives",
  "serde",
@@ -5327,6 +5328,7 @@ dependencies = [
 [[package]]
 name = "twine-utils"
 version = "0.1.0"
+source = "git+ssh://git@github.com/twinexyz/weaver?branch=lilixac%2Fintegrate-aggregator#c4244669a53855a4af2643fe4bed9eb968aa93f1"
 dependencies = [
  "alloy-primitives",
  "serde",

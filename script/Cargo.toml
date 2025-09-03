@@ -24,7 +24,7 @@ clap = { version = "4.0", features = ["derive", "env"] }
 tracing = "0.1.40"
 hex = "0.4.3"
 solana-stub-prover-lib = { path = "../lib" }
-twine-types = { path = "../../weaver/crates/types" }
+twine-types = { git = "ssh://git@github.com/twinexyz/weaver", branch = "lilixac/integrate-aggregator" }
 # Match the actual version being used by weaver
 alloy-primitives = "1.2.1"
 dotenv = "0.15.0"
