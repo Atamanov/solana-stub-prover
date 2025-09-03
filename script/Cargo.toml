@@ -12,6 +12,10 @@ path = "src/bin/main.rs"
 name = "consumer"
 path = "src/bin/consumer.rs"
 
+[[bin]]
+name = "kafka_admin"
+path = "src/bin/kafka_admin.rs"
+
 [dependencies]
 sp1-sdk = "5.0.8"
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }

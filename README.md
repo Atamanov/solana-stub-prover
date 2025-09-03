@@ -185,13 +185,21 @@ cargo run --release --bin consumer -- --connection-timeout 60
 
 ### TLS Certificate Setup
 
-The prover and consumer use TLS by default. Place your certificates in the project directory:
+The prover and consumer use TLS by default. Place your certificates in the **project root directory** (`/Users/alexander/Projects/Twine/solana3/solana-stub-prover/`):
 
 ```bash
-# Required certificate files
+# Required certificate files (relative to where you run the commands)
 ./ca.crt        # CA certificate
 ./user.crt      # Client certificate  
 ./user.key      # Client private key
+```
+
+If you run commands from the project root with `cargo run`, the certificates should be in:
+```
+/Users/alexander/Projects/Twine/solana3/solana-stub-prover/
+├── ca.crt
+├── user.crt
+└── user.key
 ```
 
 ### Using TLS (Default)
@@ -230,8 +238,10 @@ cargo run --release --bin consumer -- \
 
 ### Disabling TLS (Plain Connection)
 
+If you don't have TLS certificates, you can use a plain connection to the legacy broker:
+
 ```bash
-# Prover without TLS
+# Prover without TLS (uses b-1.test.7alql0.c5.kafka.us-east-1.amazonaws.com:9092)
 cargo run --release --bin solana-stub-prover -- \
   --start-slot 100000 \
   --end-slot 100100 \
@@ -294,6 +304,33 @@ solana-stub-prover/
 │       ├── solana.rs       # Solana RPC functions
 │       └── kafka.rs        # Kafka publishing
 └── Cargo.toml         # Workspace configuration
+```
+
+## Kafka Admin Tool
+
+A Kafka admin tool is included to manage topics:
+
+```bash
+# Check if the default topic exists
+cargo run --release --bin kafka_admin -- --no-tls check
+
+# List all topics
+cargo run --release --bin kafka_admin -- --no-tls list
+
+# Create the topic if needed
+cargo run --release --bin kafka_admin -- --no-tls create
+
+# Get metadata about the cluster
+cargo run --release --bin kafka_admin -- --no-tls metadata
+```
+
+With TLS:
+```bash
+# Check topic with TLS
+cargo run --release --bin kafka_admin -- check
+
+# Create topic with custom settings
+cargo run --release --bin kafka_admin -- create --topic my-topic --partitions 5 --replication-factor 2
 ```
 
 ## Troubleshooting
