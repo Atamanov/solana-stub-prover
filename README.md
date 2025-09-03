@@ -55,6 +55,7 @@ RUST_LOG=info cargo run --release --bin solana-stub-prover -- \
 
 ### Prover Parameters
 
+#### Core Parameters
 - `--start-slot`: Starting slot number
 - `--end-slot`: Ending slot number (must be > start_slot)
 - `--account`: Solana account pubkey in base58 format to monitor
@@ -62,6 +63,14 @@ RUST_LOG=info cargo run --release --bin solana-stub-prover -- \
 - `--prove`: Generate proof and publish to Kafka
 - `--groth16`: Generate Groth16 proof for on-chain verification (default: true)
 - `--compressed-only`: Generate only compressed proof (faster, not verifiable on-chain)
+
+#### Kafka TLS Parameters
+- `--kafka-tls`: Use TLS for Kafka connection (default: true)
+- `--no-kafka-tls`: Disable TLS, use plain connection
+- `--kafka-ca-cert <PATH>`: CA certificate file path (default: ./ca.crt)
+- `--kafka-client-cert <PATH>`: Client certificate file path (default: ./user.crt)
+- `--kafka-client-key <PATH>`: Client key file path (default: ./user.key)
+- `--kafka-broker <ADDRESS>`: Override Kafka broker address
 
 ## Kafka Consumer
 
@@ -155,9 +164,72 @@ cargo run --release --bin consumer -- --connection-timeout 60
 
 ## Kafka Configuration
 
-- Host: `b-1.test.7alql0.c5.kafka.us-east-1.amazonaws.com:9092`
-- Topic: `twine.solana.proofs`
-- Message format: JSON-serialized `ZkProof` structure
+### Default Endpoints
+
+- **TLS/SSL (default)**: `kafka-bootstrap.twine.limited:443`
+- **Plain (legacy)**: `b-1.test.7alql0.c5.kafka.us-east-1.amazonaws.com:9092`
+- **Topic**: `twine.solana.proofs`
+- **Message format**: JSON-serialized proof data
+
+### TLS Certificate Setup
+
+The prover and consumer use TLS by default. Place your certificates in the project directory:
+
+```bash
+# Required certificate files
+./ca.crt        # CA certificate
+./user.crt      # Client certificate  
+./user.key      # Client private key
+```
+
+### Using TLS (Default)
+
+```bash
+# Prover with TLS (default)
+cargo run --release --bin solana-stub-prover -- \
+  --start-slot 100000 \
+  --end-slot 100100 \
+  --account "11111111111111111111111111111111" \
+  --prove
+
+# Consumer with TLS (default)
+cargo run --release --bin consumer
+```
+
+### Using Custom Certificate Paths
+
+```bash
+# Prover with custom cert paths
+cargo run --release --bin solana-stub-prover -- \
+  --start-slot 100000 \
+  --end-slot 100100 \
+  --account "11111111111111111111111111111111" \
+  --prove \
+  --kafka-ca-cert /path/to/ca.crt \
+  --kafka-client-cert /path/to/client.crt \
+  --kafka-client-key /path/to/client.key
+
+# Consumer with custom cert paths
+cargo run --release --bin consumer -- \
+  --ca-cert /path/to/ca.crt \
+  --client-cert /path/to/client.crt \
+  --client-key /path/to/client.key
+```
+
+### Disabling TLS (Plain Connection)
+
+```bash
+# Prover without TLS
+cargo run --release --bin solana-stub-prover -- \
+  --start-slot 100000 \
+  --end-slot 100100 \
+  --account "11111111111111111111111111111111" \
+  --prove \
+  --no-kafka-tls
+
+# Consumer without TLS
+cargo run --release --bin consumer -- --no-tls
+```
 
 ## Environment Variables
 

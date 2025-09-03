@@ -7,7 +7,7 @@ use serde_json;
 use std::fs;
 use solana_stub_prover_lib::{ProverInput, PublicCommitments, AccountStateCommitment};
 use solana_stub_prover_script::{
-    kafka::publish_json_to_kafka,
+    kafka::{publish_json_to_kafka_with_config, KafkaConfig},
     solana::{fetch_account_info, get_current_slot},
     utils::{base58_to_bytes32, get_epoch_for_slot, sha256_from_u64, sha256_hash},
 };
@@ -51,6 +51,30 @@ struct Args {
     /// Generate compressed proof only (faster, but not verifiable on-chain)
     #[arg(long)]
     compressed_only: bool,
+    
+    /// Use TLS for Kafka connection (default: true)
+    #[arg(long, default_value = "true")]
+    kafka_tls: bool,
+    
+    /// CA certificate file path for Kafka TLS
+    #[arg(long, default_value = "./ca.crt")]
+    kafka_ca_cert: String,
+    
+    /// Client certificate file path for Kafka TLS
+    #[arg(long, default_value = "./user.crt")]
+    kafka_client_cert: String,
+    
+    /// Client key file path for Kafka TLS
+    #[arg(long, default_value = "./user.key")]
+    kafka_client_key: String,
+    
+    /// Kafka broker address (overrides default)
+    #[arg(long)]
+    kafka_broker: Option<String>,
+    
+    /// Disable Kafka TLS (use plain connection)
+    #[arg(long)]
+    no_kafka_tls: bool,
 }
 
 #[tokio::main]
@@ -205,9 +229,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             fs::write("last_kafka_message.json", &zk_proof_json).expect("Failed to write last_kafka_message.json");
             println!("Full Kafka message saved to last_kafka_message.json");
             
+            // Configure Kafka
+            let kafka_config = KafkaConfig {
+                use_tls: !args.no_kafka_tls && args.kafka_tls,
+                ca_cert_path: Some(args.kafka_ca_cert.clone()),
+                client_cert_path: Some(args.kafka_client_cert.clone()),
+                client_key_path: Some(args.kafka_client_key.clone()),
+                broker: args.kafka_broker.clone(),
+            };
+            
             // Publish to Kafka as JSON
             println!("Publishing compressed proof to Kafka...");
-            publish_json_to_kafka(zk_proof).await?;
+            publish_json_to_kafka_with_config(zk_proof, &kafka_config).await?;
             println!("Compressed proof successfully published to Kafka!");
         } else {
             // Generate Groth16 proof for on-chain verification (default)
@@ -258,9 +291,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             fs::write("last_kafka_message.json", &zk_proof_json).expect("Failed to write last_kafka_message.json");
             println!("Full Kafka message saved to last_kafka_message.json");
             
+            // Configure Kafka
+            let kafka_config = KafkaConfig {
+                use_tls: !args.no_kafka_tls && args.kafka_tls,
+                ca_cert_path: Some(args.kafka_ca_cert.clone()),
+                client_cert_path: Some(args.kafka_client_cert.clone()),
+                client_key_path: Some(args.kafka_client_key.clone()),
+                broker: args.kafka_broker.clone(),
+            };
+            
             // Publish to Kafka as JSON
             println!("Publishing Groth16 proof to Kafka...");
-            publish_json_to_kafka(zk_proof).await?;
+            publish_json_to_kafka_with_config(zk_proof, &kafka_config).await?;
             println!("Groth16 proof successfully published to Kafka!");
         }
     }

@@ -10,7 +10,8 @@ use futures::StreamExt;
 use chrono::Utc;
 use std::time::Duration;
 
-const DEFAULT_KAFKA_BROKER: &str = "b-1.test.7alql0.c5.kafka.us-east-1.amazonaws.com:9092";
+const DEFAULT_KAFKA_BROKER_TLS: &str = "kafka-bootstrap.twine.limited:443";
+const DEFAULT_KAFKA_BROKER_PLAIN: &str = "b-1.test.7alql0.c5.kafka.us-east-1.amazonaws.com:9092";
 const KAFKA_TOPIC: &str = "twine.solana.proofs";
 
 /// Command line arguments for the consumer
@@ -18,8 +19,8 @@ const KAFKA_TOPIC: &str = "twine.solana.proofs";
 #[command(author, version, about = "Kafka consumer for Solana proofs", long_about = None)]
 struct Args {
     /// Kafka broker address (can be comma-separated list)
-    #[arg(long, default_value = DEFAULT_KAFKA_BROKER)]
-    broker: String,
+    #[arg(long)]
+    broker: Option<String>,
     
     /// Consumer group ID
     #[arg(long, default_value = "solana-proof-consumer")]
@@ -64,6 +65,26 @@ struct Args {
     /// Connection timeout in seconds
     #[arg(long, default_value = "30")]
     connection_timeout: u64,
+    
+    /// Use TLS connection (default: true)
+    #[arg(long, default_value = "true")]
+    tls: bool,
+    
+    /// CA certificate file path
+    #[arg(long, default_value = "./ca.crt")]
+    ca_cert: String,
+    
+    /// Client certificate file path  
+    #[arg(long, default_value = "./user.crt")]
+    client_cert: String,
+    
+    /// Client key file path
+    #[arg(long, default_value = "./user.key")]
+    client_key: String,
+    
+    /// Disable TLS (use plain connection)
+    #[arg(long)]
+    no_tls: bool,
 }
 
 fn format_bytes(bytes: &[u8], max_len: usize) -> String {
@@ -140,16 +161,26 @@ fn print_proof_details(proof: &ZkProof, raw: bool, minimal: bool) {
     println!("╚══════════════════════════════════════════════════════════════════════");
 }
 
-async fn test_connection(broker: &str, timeout_secs: u64) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_connection(broker: &str, timeout_secs: u64, args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔄 Testing connection to broker: {}", broker);
     
     let mut test_config = ClientConfig::new();
-    let test_consumer: Result<StreamConsumer, _> = test_config
+    test_config
         .set("bootstrap.servers", broker)
         .set("group.id", "connection-test")
         .set("socket.timeout.ms", &format!("{}", timeout_secs * 1000))
-        .set("session.timeout.ms", "6000")
-        .create();
+        .set("session.timeout.ms", "6000");
+    
+    // Configure TLS if enabled
+    let use_tls = !args.no_tls && args.tls;
+    if use_tls {
+        test_config.set("security.protocol", "ssl");
+        test_config.set("ssl.ca.location", &args.ca_cert);
+        test_config.set("ssl.certificate.location", &args.client_cert);
+        test_config.set("ssl.key.location", &args.client_key);
+    }
+    
+    let test_consumer: Result<StreamConsumer, _> = test_config.create();
     
     match test_consumer {
         Ok(consumer) => {
@@ -179,11 +210,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse arguments
     let args = Args::parse();
     
+    // Determine if TLS should be used
+    let use_tls = !args.no_tls && args.tls;
+    
+    // Determine broker address
+    let broker = args.broker.clone().unwrap_or_else(|| {
+        if use_tls {
+            DEFAULT_KAFKA_BROKER_TLS.to_string()
+        } else {
+            DEFAULT_KAFKA_BROKER_PLAIN.to_string()
+        }
+    });
+    
     println!("🚀 Starting Kafka Consumer");
-    println!("📍 Broker(s): {}", args.broker);
+    println!("📍 Broker(s): {}", broker);
     println!("📨 Topic: {}", KAFKA_TOPIC);
     println!("👥 Group ID: {}", args.group_id);
-    println!("🔐 Security Protocol: {}", args.security_protocol);
+    println!("🔐 Security Protocol: {}", if use_tls { "SSL/TLS" } else { args.security_protocol.as_str() });
     
     if args.sasl {
         println!("🔑 SASL Authentication: Enabled");
@@ -204,11 +247,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     println!("────────────────────────────────────────────────────────────────────");
     
+    // Show TLS configuration if enabled
+    if use_tls {
+        println!("🔒 TLS Configuration:");
+        println!("   CA Certificate: {}", args.ca_cert);
+        println!("   Client Certificate: {}", args.client_cert);
+        println!("   Client Key: {}", args.client_key);
+        
+        // Check if certificate files exist
+        use std::path::Path;
+        if !Path::new(&args.ca_cert).exists() {
+            eprintln!("⚠️  Warning: CA certificate not found at {}", args.ca_cert);
+        }
+        if !Path::new(&args.client_cert).exists() {
+            eprintln!("⚠️  Warning: Client certificate not found at {}", args.client_cert);
+        }
+        if !Path::new(&args.client_key).exists() {
+            eprintln!("⚠️  Warning: Client key not found at {}", args.client_key);
+        }
+    }
+    
     // Test connection first
-    if let Err(e) = test_connection(&args.broker, args.connection_timeout).await {
+    if let Err(e) = test_connection(&broker, args.connection_timeout, &args).await {
         eprintln!("\n❌ Connection test failed: {}", e);
         eprintln!("\n🔍 Troubleshooting tips:");
-        eprintln!("   1. Check if the broker address is correct: {}", args.broker);
+        eprintln!("   1. Check if the broker address is correct: {}", broker);
         eprintln!("   2. Verify network connectivity to the broker");
         eprintln!("   3. Check if authentication is required (use --sasl flag)");
         eprintln!("   4. Ensure the broker port is not blocked by firewall");
@@ -228,26 +291,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create consumer configuration
     let mut config = ClientConfig::new();
     config
-        .set("bootstrap.servers", &args.broker)
+        .set("bootstrap.servers", &broker)
         .set("group.id", &args.group_id)
         .set("enable.auto.commit", "true")
         .set("auto.commit.interval.ms", "1000")
         .set("session.timeout.ms", "6000")
         .set("socket.timeout.ms", &format!("{}", args.connection_timeout * 1000))
         .set("api.version.request.timeout.ms", "10000")
-        .set("enable.auto.offset.store", "true")
-        .set("security.protocol", &args.security_protocol);
+        .set("enable.auto.offset.store", "true");
     
-    // Add SASL configuration if enabled
-    if args.sasl {
-        config.set("sasl.mechanism", &args.sasl_mechanism);
+    // Configure TLS if enabled
+    if use_tls {
+        config.set("security.protocol", "ssl");
+        config.set("ssl.ca.location", &args.ca_cert);
+        config.set("ssl.certificate.location", &args.client_cert);
+        config.set("ssl.key.location", &args.client_key);
+    } else {
+        config.set("security.protocol", &args.security_protocol);
         
-        if let Some(username) = &args.username {
-            config.set("sasl.username", username);
-        }
-        
-        if let Some(password) = &args.password {
-            config.set("sasl.password", password);
+        // Add SASL configuration if enabled and not using TLS
+        if args.sasl {
+            config.set("sasl.mechanism", &args.sasl_mechanism);
+            
+            if let Some(username) = &args.username {
+                config.set("sasl.username", username);
+            }
+            
+            if let Some(password) = &args.password {
+                config.set("sasl.password", password);
+            }
         }
     }
     
